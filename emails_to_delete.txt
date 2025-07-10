@@ -1,0 +1,4 @@
+# Add one email address per line. The script will delete all emails from these senders.
+# Example:
+# spam@example.com
+# another.sender@example.com
