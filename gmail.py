@@ -1,16 +1,39 @@
 import os
 import pickle
 import base64
-from email.mime.multipart import MIMEMultipart
-from email.mime.text import MIMEText
+import json
 from google_auth_oauthlib.flow import InstalledAppFlow
 from google.auth.transport.requests import Request
 from googleapiclient.discovery import build
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
 
 class Gmail:
     def __init__(self, credentials_file='credentials.json'):
         self.credentials_file = credentials_file
+        self._generate_credentials_if_needed()
         self.service = self._get_gmail_service()
+
+    def _generate_credentials_if_needed(self):
+        if not os.path.exists(self.credentials_file):
+            print("credentials.json not found. Generating from .env file...")
+            creds_data = {
+                "installed": {
+                    "client_id": os.getenv("GOOGLE_CLIENT_ID"),
+                    "project_id": os.getenv("GOOGLE_PROJECT_ID"),
+                    "auth_uri": os.getenv("GOOGLE_AUTH_URI"),
+                    "token_uri": os.getenv("GOOGLE_TOKEN_URI"),
+                    "auth_provider_x509_cert_url": os.getenv("GOOGLE_AUTH_PROVIDER_URL"),
+                    "client_secret": os.getenv("GOOGLE_CLIENT_SECRET"),
+                    "redirect_uris": [os.getenv("GOOGLE_REDIRECT_URIS")]
+                }
+            }
+            if not all([creds_data["installed"]["client_id"], creds_data["installed"]["client_secret"]]):
+                 raise ValueError("Missing Google credentials in .env file. Please set GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET.")
+
+            with open(self.credentials_file, 'w') as f:
+                json.dump(creds_data, f)
+            print("credentials.json generated successfully.")
 
     def _get_gmail_service(self):
         creds = None

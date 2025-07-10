@@ -1,48 +1,75 @@
-from gmail import Gmail
 from dotenv import load_dotenv
-import os
+load_dotenv() # Load environment variables first
+
+from gmail import Gmail
 from datetime import datetime, timedelta
+import os
 
-load_dotenv()
+# --- Configuration Variables ---
+# Set the action to perform: "delete-by-sender", "delete-by-age", "send", or ""
+ACTION = os.getenv("ACTION", "").lower()
 
-def delete_old_emails(gmail):
-    three_years_ago = datetime.now() - timedelta(days=3*365)
-    query = f'before:{three_years_ago.strftime("%Y/%m/%d")}'
+# --- Settings for 'delete-by-sender' ---
+SENDER_TO_DELETE = os.getenv("SENDER_TO_DELETE")
+
+# --- Settings for 'delete-by-age' ---
+DAYS_TO_DELETE = int(os.getenv("DAYS_TO_DELETE", 1095))
+
+# --- Settings for 'send' ---
+RECIPIENT_EMAIL = os.getenv("RECIPIENT_EMAIL")
+EMAIL_SUBJECT = os.getenv("EMAIL_SUBJECT")
+EMAIL_BODY = os.getenv("EMAIL_BODY")
+
+def delete_emails_by_sender(gmail):
+    """Deletes emails from a specific sender."""
+    if not SENDER_TO_DELETE:
+        print("SENDER_TO_DELETE is not set. Skipping.")
+        return
+    print(f"Searching for emails from {SENDER_TO_DELETE}...")
+    emails = gmail.search_emails(f'from:{SENDER_TO_DELETE}')
+    if not emails:
+        print(f"No emails found from {SENDER_TO_DELETE}.")
+        return
+    print(f"Found {len(emails)} emails. Trashing them...")
+    for email in emails:
+        gmail.trash_email(email['id'])
+    print("Done.")
+
+def delete_emails_by_age(gmail):
+    """Deletes emails older than a specified number of days."""
+    cutoff_date = datetime.now() - timedelta(days=DAYS_TO_DELETE)
+    query = f'before:{cutoff_date.strftime("%Y/%m/%d")}'
+    print(f"Searching for emails older than {DAYS_TO_DELETE} days (before {cutoff_date.strftime('%Y-%m-%d')})...")
     emails = gmail.search_emails(query)
     if not emails:
-        print("No emails found older than 3 years.")
-    else:
-        for email in emails:
-            gmail.trash_email(email['id'])
+        print("No emails found matching the criteria.")
+        return
+    print(f"Found {len(emails)} emails. Trashing them...")
+    for email in emails:
+        gmail.trash_email(email['id'])
+    print("Done.")
+
+def send_email_action(gmail):
+    """Sends an email."""
+    if not RECIPIENT_EMAIL:
+        print("RECIPIENT_EMAIL is not set. Skipping.")
+        return
+    print(f"Sending email to {RECIPIENT_EMAIL}...")
+    gmail.send_email(RECIPIENT_EMAIL, EMAIL_SUBJECT, EMAIL_BODY)
+    print("Email sent.")
 
 def main():
     gmail = Gmail()
-    
-    # Delete emails from a specific sender
-    sender_to_delete = os.getenv("SENDER_TO_DELETE")
-    if sender_to_delete:
-        emails = gmail.search_emails(f'from:{sender_to_delete}')
-        if not emails:
-            print(f"No emails found from {sender_to_delete}.")
-        else:
-            for email in emails:
-                gmail.trash_email(email['id'])
 
-    # Delete emails older than 3 years
-    delete_old_emails(gmail)
-
-    # Example of sending an email with HTML content
-    recipient = "recipient@example.com"
-    subject = "Hello from Gemini!"
-    html_body = """
-    <html>
-        <body>
-            <p style="font-family: sans-serif; font-size: 14px; color: #333;">This is a test email sent from the Gmail Cleaner script.</p>
-            <p style="font-family: Georgia, serif; font-size: 16px; color: #0055a5; font-weight: bold;">You can use any HTML and CSS to style your email!</p>
-        </body>
-    </html>
-    """
-    gmail.send_email(recipient, subject, html_body)
+    action = ACTION.lower().strip()
+    if action == 'delete-by-sender':
+        delete_emails_by_sender(gmail)
+    elif action == 'delete-by-age':
+        delete_emails_by_age(gmail)
+    elif action == 'send':
+        send_email_action(gmail)
+    else:
+        print(f"No action specified. Please set the ACTION variable in the .env file.")
 
 if __name__ == "__main__":
     main()
